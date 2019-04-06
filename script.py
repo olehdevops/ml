@@ -29,3 +29,12 @@ pred = regressor.predict(input_fn=wx_input_fn(X,
                                               shuffle=False))
 predictions = np.array([p['predictions'][0] for p in pred])
 print(predictions)
+
+
+from flask import Flask
+app = Flask(__name__)
+@app.route('/')
+def hello_world():
+   return 'Hello World! Prediction temperature ', predictions
+if __name__ == '__main__':
+   app.run(host='0.0.0.0', port=80, debug=True)
