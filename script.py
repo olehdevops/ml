@@ -45,11 +45,11 @@ def predictions():
 
         pred_data = []
         for i in predictions:
-            pred_data.append(i)
+            pred_data.append(float(i))
 
         test_data = []
         for i in y_test:
-            test_data.append(i)
+            test_data.append(float(i))
 
         demo_data = json.dumps({"pred_data": pred_data, "test_data": test_data})
 
