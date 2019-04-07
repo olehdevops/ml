@@ -51,9 +51,9 @@ def predictions():
         for i in y_test:
             test_data.append(i)
 
-        demo_data = {"pred_data": pred_data, "test_data": test_data}
+        demo_data = json.dumps({"pred_data": pred_data, "test_data": test_data})
 
-        return json.dumps(demo_data)
+        return demo_data
 
 
     else:
