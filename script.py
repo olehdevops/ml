@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
-import tensorflow as tf
-from sklearn.metrics import explained_variance_score, mean_absolute_error, median_absolute_error
-from sklearn.model_selection import train_test_split
+# import tensorflow as tf
+# from sklearn.metrics import explained_variance_score, mean_absolute_error, median_absolute_error
+# from sklearn.model_selection import train_test_split
 from flask import Flask, request
 import requests
 import json
@@ -10,7 +10,7 @@ import json
 app = Flask(__name__)
 
 @app.route('/', methods=['GET', 'POST'])
-def hello_world(request):
+def hello_world():
 
     data_from_api = json.loads(request.data.decode("utf-8"))
 
