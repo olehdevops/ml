@@ -80,7 +80,7 @@ def predictions():
                                                   shuffle=False))
     predictions = np.array([p['predictions'][0] for p in pred])
 
-    res_pred[city] = float(predictions[0])
+    res_pred[city] = round(float(predictions[0]), 2)
 
 
 
