@@ -10,7 +10,7 @@ import json
 app = Flask(__name__)
 
 @app.route('/', methods=['GET', 'POST'])
-def hello_world():
+def predictions():
 
     data_from_api = json.loads(request.data.decode("utf-8"))
 
