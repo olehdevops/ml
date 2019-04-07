@@ -14,77 +14,119 @@ def predictions():
 
     data_from_api = json.loads(request.data.decode("utf-8"))
 
-    records =[]
-    city = ""
-    for k, v in data_from_api.items():
-        city = k
-        records = v
+    if data_from_api == "test":
+        df = pd.read_csv('dataset.csv').set_index('date')
 
-    res_pred = {}
+        df = df.drop(['mintempm', 'maxtempm'], axis=1)
 
-    features = ["date", "meantempm", "meandewptm", "meanpressurem", "maxhumidity", "minhumidity", "maxtempm",
-                "mintempm", "maxdewptm", "mindewptm", "maxpressurem", "minpressurem", "precipm"]
+        # X will be a pandas dataframe of all columns except meantempm
+        X = df[[col for col in df.columns if col != 'meantempm']]
+
+        # y will be a pandas series of the meantempm
+        y = df['meantempm']
+
+        X_train, X_tmp, y_train, y_tmp = train_test_split(X, y, test_size=0.2, random_state=23)
+        X_test, X_val, y_test, y_val = train_test_split(X_tmp, y_tmp, test_size=0.5, random_state=23)
+
+        feature_cols = [tf.feature_column.numeric_column(col) for col in X.columns]
+
+        regressor = tf.estimator.DNNRegressor(feature_columns=feature_cols,
+                                              hidden_units=[50, 50],
+                                              model_dir='tf_wx_model')
+
+        def wx_input_fn(X, y=None, num_epochs=None, shuffle=True, batch_size=400):
+            return tf.estimator.inputs.pandas_input_fn(x=X, y=y, num_epochs=num_epochs, shuffle=shuffle,
+                                                       batch_size=batch_size)
+
+        pred = regressor.predict(input_fn=wx_input_fn(X_test,
+                                                      num_epochs=1,
+                                                      shuffle=False))
+        predictions = np.array([p['predictions'][0] for p in pred])
+
+        pred_data = []
+        for i in predictions:
+            pred_data.append(i)
+
+        test_data = []
+        for i in y_test:
+            test_data.append(i)
+
+        demo_data = {"pred_data": pred_data, "test_data": test_data}
+
+        return json.dumps(demo_data)
 
 
-    df = pd.DataFrame(records, columns=features).set_index('date')
-    tmp = df[['meantempm', 'meandewptm']].head(5)
+    else:
 
-    N = 1
+        records =[]
+        city = ""
+        for k, v in data_from_api.items():
+            city = k
+            records = v
 
-    feature = 'meantempm'
+        res_pred = {}
 
-    rows = tmp.shape[0]
-    nth_prior_measurements = [None] * N + [tmp[feature][i - N] for i in range(N, rows)]
+        features = ["date", "meantempm", "meandewptm", "meanpressurem", "maxhumidity", "minhumidity", "maxtempm",
+                    "mintempm", "maxdewptm", "mindewptm", "maxpressurem", "minpressurem", "precipm"]
 
-    col_name = "{}_{}".format(feature, N)
-    tmp[col_name] = nth_prior_measurements
 
-    def derive_nth_day_feature(df, feature, N):
-        rows = df.shape[0]
-        nth_prior_meassurements = [None] * N + [df[feature][i - N] for i in range(N, rows)]
+        df = pd.DataFrame(records, columns=features).set_index('date')
+        tmp = df[['meantempm', 'meandewptm']].head(5)
+
+        N = 1
+
+        feature = 'meantempm'
+
+        rows = tmp.shape[0]
+        nth_prior_measurements = [None] * N + [tmp[feature][i - N] for i in range(N, rows)]
+
         col_name = "{}_{}".format(feature, N)
-        df[col_name] = nth_prior_meassurements
+        tmp[col_name] = nth_prior_measurements
 
-    for feature in features:
-        if feature != 'date':
-            for N in range(1, 4):
-                derive_nth_day_feature(df, feature, N)
+        def derive_nth_day_feature(df, feature, N):
+            rows = df.shape[0]
+            nth_prior_meassurements = [None] * N + [df[feature][i - N] for i in range(N, rows)]
+            col_name = "{}_{}".format(feature, N)
+            df[col_name] = nth_prior_meassurements
 
-    to_remove = [feature for feature in features if feature not in ['meantempm', 'mintempm', 'maxtempm']]
+        for feature in features:
+            if feature != 'date':
+                for N in range(1, 4):
+                    derive_nth_day_feature(df, feature, N)
 
-    to_keep = [col for col in df.columns if col not in to_remove]
-    df = df[to_keep]
-    df = df.apply(pd.to_numeric, errors='coerce')
+        to_remove = [feature for feature in features if feature not in ['meantempm', 'mintempm', 'maxtempm']]
 
-    for precip_col in ['precipm_1', 'precipm_2', 'precipm_3']:
-        missing_vals = pd.isnull(df[precip_col])
-        df[precip_col][missing_vals] = 0
+        to_keep = [col for col in df.columns if col not in to_remove]
+        df = df[to_keep]
+        df = df.apply(pd.to_numeric, errors='coerce')
 
-    df = df.dropna()
-    df = df.drop(['mintempm', 'maxtempm', 'meantempm'], axis=1)
+        for precip_col in ['precipm_1', 'precipm_2', 'precipm_3']:
+            missing_vals = pd.isnull(df[precip_col])
+            df[precip_col][missing_vals] = 0
 
-    X = df[[col for col in df.columns if col != 'meantempm']]
+        df = df.dropna()
+        df = df.drop(['mintempm', 'maxtempm', 'meantempm'], axis=1)
 
-    feature_cols = [tf.feature_column.numeric_column(col) for col in X.columns]
+        X = df[[col for col in df.columns if col != 'meantempm']]
 
-    regressor = tf.estimator.DNNRegressor(feature_columns=feature_cols,
-                                          hidden_units=[50, 50],
-                                          model_dir='tf_wx_model')
+        feature_cols = [tf.feature_column.numeric_column(col) for col in X.columns]
 
-    def wx_input_fn(X, y=None, num_epochs=None, shuffle=True, batch_size=400):
-        return tf.estimator.inputs.pandas_input_fn(x=X, y=y, num_epochs=num_epochs, shuffle=shuffle,
-                                                   batch_size=batch_size)
+        regressor = tf.estimator.DNNRegressor(feature_columns=feature_cols,
+                                              hidden_units=[50, 50],
+                                              model_dir='tf_wx_model')
 
-    pred = regressor.predict(input_fn=wx_input_fn(X,
-                                                  num_epochs=1,
-                                                  shuffle=False))
-    predictions = np.array([p['predictions'][0] for p in pred])
+        def wx_input_fn(X, y=None, num_epochs=None, shuffle=True, batch_size=400):
+            return tf.estimator.inputs.pandas_input_fn(x=X, y=y, num_epochs=num_epochs, shuffle=shuffle,
+                                                       batch_size=batch_size)
 
-    res_pred[city] = round(float(predictions[0]), 2)
+        pred = regressor.predict(input_fn=wx_input_fn(X,
+                                                      num_epochs=1,
+                                                      shuffle=False))
+        predictions = np.array([p['predictions'][0] for p in pred])
 
+        res_pred[city] = round(float(predictions[0]), 2)
 
-
-    return json.dumps(res_pred)
+        return json.dumps(res_pred)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True)
