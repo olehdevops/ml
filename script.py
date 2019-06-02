@@ -8,7 +8,7 @@ import requests
 import json
 
 app = Flask(__name__)
-#testing
+#testing2
 
 @app.route('/', methods=['GET', 'POST'])
 def predictions():
